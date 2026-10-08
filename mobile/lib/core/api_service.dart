@@ -40,6 +40,23 @@ class ApiService {
     }
   }
 
+  /// Fire-and-forget background ping to wake up Render free tier container immediately
+  Future<void> pingServer() async {
+    try {
+      final rootUrl = _baseUrl.replaceAll('/api/v1', '');
+      await _dio.get(
+        '$rootUrl/',
+        options: Options(
+          receiveTimeout: const Duration(seconds: 55),
+          sendTimeout: const Duration(seconds: 15),
+        ),
+      );
+      debugPrint('Backend server wake-up ping succeeded: Render container is awake.');
+    } catch (e) {
+      debugPrint('Backend wake-up ping sent: $e');
+    }
+  }
+
   Future<void> saveBaseUrl(String newUrl) async {
     setBaseUrl(newUrl);
     await _storage.write(key: 'custom_api_base_url', value: newUrl);
