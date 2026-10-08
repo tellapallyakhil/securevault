@@ -125,7 +125,7 @@ void main() {
       final result = PIIClassifier.analyzeText(sampleEducationalMarksheet);
       // Must strictly be Educational, NEVER Financial despite "Credits", "Total Marks", and "Statement of Marks"!
       expect(result['category'], equals('Educational'));
-      expect(result['document_type'], equals('Educational Record'));
+      expect(result['document_type'], equals('Educational Marksheet'));
     });
 
     test('Correctly classifies University Degree Certificate', () {
@@ -140,7 +140,22 @@ void main() {
 
       final result = PIIClassifier.analyzeText(sampleDegree);
       expect(result['category'], equals('Educational'));
-      expect(result['document_type'], equals('Educational Record'));
+      expect(result['document_type'], equals('Degree / Diploma Certificate'));
+    });
+
+    test('Correctly classifies Coding Questions & Exam papers as Educational', () {
+      const sampleCoding = '''
+      Accenture Technical Assessment
+      Coding Questions in Java
+      Question 1: Given an array of integers, find the sum of all elements.
+      Input Format: N integers separated by space.
+      Candidate Roll No: 2024CS0192
+      Examination Portal: www.examnr.io
+      ''';
+
+      final result = PIIClassifier.analyzeText(sampleCoding);
+      expect(result['category'], equals('Educational'));
+      expect(result['document_type'], anyOf(equals('Question Paper / Test Assignment'), equals('Examination / Assessment Record'), equals('Educational Record')));
     });
 
     test('Correctly redacts sensitive PII from text', () {

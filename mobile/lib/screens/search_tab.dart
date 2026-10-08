@@ -15,6 +15,8 @@ class _SearchTabState extends State<SearchTab> {
   final _searchController = TextEditingController();
 
   final List<String> _suggestedQueries = [
+    "Educational certificates and test papers",
+    "Coding questions and exam assignments",
     "Find my recent payment documents",
     "Show high sensitivity identity files",
     "Documents from this month",

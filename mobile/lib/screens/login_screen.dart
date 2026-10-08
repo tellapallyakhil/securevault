@@ -35,9 +35,9 @@ class _LoginScreenState extends State<LoginScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Row(
           children: [
-            Icon(Icons.dns, color: VaultTheme.primaryCyan, size: 20),
+            Icon(Icons.cloud_done_rounded, color: VaultTheme.primaryCyan, size: 22),
             SizedBox(width: 8),
-            Text("Backend Server URL", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            Text("Backend Server URL", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: VaultTheme.textPrimary)),
           ],
         ),
         content: Column(
@@ -45,18 +45,30 @@ class _LoginScreenState extends State<LoginScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              "Ensure your phone is on the same Wi-Fi as your PC, or enter your PC's IP address:",
+              "Production Cloud API is hosted live on Render:",
               style: TextStyle(fontSize: 12, color: VaultTheme.textSecondary),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             TextField(
               controller: urlController,
               decoration: InputDecoration(
                 labelText: "Server Endpoint",
-                hintText: "http://10.2.3.161:8000/api/v1",
+                hintText: "https://securevault-4rpl.onrender.com/api/v1",
                 filled: true,
                 fillColor: VaultTheme.surfaceElevated,
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              onPressed: () {
+                urlController.text = "https://securevault-4rpl.onrender.com/api/v1";
+              },
+              icon: const Icon(Icons.refresh, size: 14, color: VaultTheme.primaryCyan),
+              label: const Text("Reset to Render Cloud URL", style: TextStyle(fontSize: 11, color: VaultTheme.primaryCyan)),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: VaultTheme.primaryCyan, width: 0.8),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               ),
             ),
           ],
@@ -71,12 +83,16 @@ class _LoginScreenState extends State<LoginScreen> {
               final newUrl = urlController.text.trim();
               if (newUrl.isNotEmpty) {
                 await api.saveBaseUrl(newUrl);
+                api.pingServer();
                 if (ctx.mounted) {
                   Navigator.pop(ctx);
                 }
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text("Server URL updated to: $newUrl")),
+                    SnackBar(
+                      content: Text("Server URL updated & connecting: $newUrl"),
+                      backgroundColor: VaultTheme.statusSafe,
+                    ),
                   );
                 }
               }

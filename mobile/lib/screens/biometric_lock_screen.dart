@@ -83,20 +83,20 @@ class _BiometricLockScreenState extends State<BiometricLockScreen> with SingleTi
     }
   }
 
-  Future<void> _verifyFaceLock({bool fromGallery = false}) async {
+  Future<void> _verifyFaceLock() async {
     try {
-      if (!fromGallery && !kIsWeb) {
+      if (!kIsWeb) {
         final cameraStatus = await Permission.camera.request();
         if (!cameraStatus.isGranted) {
           if (mounted) {
-            setState(() => _statusMessage = "Camera permission is required for FaceLock.");
+            setState(() => _statusMessage = "Front camera permission is required for FaceLock biometric verification.");
           }
           return;
         }
       }
 
       final photo = await _picker.pickImage(
-        source: fromGallery ? ImageSource.gallery : ImageSource.camera,
+        source: ImageSource.camera,
         preferredCameraDevice: CameraDevice.front,
         maxWidth: 800,
         maxHeight: 800,
@@ -303,10 +303,10 @@ class _BiometricLockScreenState extends State<BiometricLockScreen> with SingleTi
                     ? null
                     : () {
                         if (_hasFaceLock) {
-                          _verifyFaceLock(fromGallery: false);
+                          _verifyFaceLock();
                         } else {
                           setState(() => _statusMessage = "FaceLock not enrolled yet. Opening camera for quick verification...");
-                          _verifyFaceLock(fromGallery: false);
+                          _verifyFaceLock();
                         }
                       },
                 icon: Icon(
@@ -330,17 +330,7 @@ class _BiometricLockScreenState extends State<BiometricLockScreen> with SingleTi
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
               ),
-              const SizedBox(height: 10),
-
-              TextButton.icon(
-                onPressed: _isScanningFace ? null : () => _verifyFaceLock(fromGallery: true),
-                icon: const Icon(Icons.photo_library_outlined, size: 18, color: VaultTheme.primaryCyan),
-                label: const Text(
-                  "Or select face portrait from Gallery",
-                  style: TextStyle(color: VaultTheme.primaryCyan, fontSize: 13, fontWeight: FontWeight.w600),
-                ),
-              ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 16),
 
               const Spacer(),
 

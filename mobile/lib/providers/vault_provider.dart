@@ -102,6 +102,21 @@ class VaultProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<bool> deleteDocument(String docId) async {
+    try {
+      final success = await _api.deleteDocument(docId);
+      if (success) {
+        _documents.removeWhere((d) => d.id == docId);
+        _searchResults.removeWhere((r) => r.docId == docId);
+        notifyListeners();
+        return true;
+      }
+    } catch (e) {
+      debugPrint("Error deleting document: $e");
+    }
+    return false;
+  }
+
   void clear() {
     _documents = [];
     _searchResults = [];

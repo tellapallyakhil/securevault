@@ -67,6 +67,10 @@ class PIIClassifier {
       'cbse', 'icse', 'ssc', 'hsc', 'board of intermediate', 'state board',
       'passed with distinction', 'first class', 'second class', 'controller of examinations',
       'registrar', 'vice chancellor', 'curriculum', 'syllabus',
+      'exam', 'examnr', 'examination', 'test', 'assessment', 'coding questions',
+      'question paper', 'questions', 'assignment', 'coursework', 'study material',
+      'lecture', 'notes', 'tutorial', 'solution', 'candidate', 'student', 'education',
+      'academic', 'course', 'learning',
     ],
     'Financial': [
       'invoice', 'tax invoice', 'proforma invoice', 'bill of supply',
@@ -182,6 +186,17 @@ class PIIClassifier {
         textLower.contains('m.tech') ||
         textLower.contains('mtech') ||
         textLower.contains('semester examination') ||
+        textLower.contains('coding questions') ||
+        textLower.contains('question paper') ||
+        textLower.contains('questions') ||
+        textLower.contains('examnr') ||
+        textLower.contains('examination') ||
+        textLower.contains('exam') ||
+        textLower.contains('assessment') ||
+        textLower.contains('assignment') ||
+        textLower.contains('coursework') ||
+        textLower.contains('study material') ||
+        textLower.contains('syllabus') ||
         (textLower.contains('university') &&
             (textLower.contains('semester') ||
                 textLower.contains('cgpa') ||
@@ -209,6 +224,21 @@ class PIIClassifier {
     // 1. Check Educational Record FIRST if educational context is present
     // This guarantees educational marksheets are never hijacked by incidental Aadhaar/PAN numbers or "Statement of Marks"
     if (isEdu) {
+      if (textLower.contains('marksheet') || textLower.contains('mark sheet') || textLower.contains('gradesheet') || textLower.contains('statement of marks')) {
+        return 'Educational Marksheet';
+      }
+      if (textLower.contains('transcript')) {
+        return 'Academic Transcript';
+      }
+      if (textLower.contains('degree') || textLower.contains('diploma')) {
+        return 'Degree / Diploma Certificate';
+      }
+      if (textLower.contains('coding questions') || textLower.contains('question paper') || textLower.contains('questions')) {
+        return 'Question Paper / Test Assignment';
+      }
+      if (textLower.contains('exam') || textLower.contains('examination') || textLower.contains('assessment') || textLower.contains('examnr')) {
+        return 'Examination / Assessment Record';
+      }
       return 'Educational Record';
     }
 

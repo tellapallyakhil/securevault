@@ -224,9 +224,9 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> with Single
     }
   }
 
-  Future<void> _enrollFaceLock({bool fromGallery = false}) async {
+  Future<void> _enrollFaceLock() async {
     try {
-      if (!fromGallery && !kIsWeb) {
+      if (!kIsWeb) {
         final cameraStatus = await Permission.camera.request();
         if (!cameraStatus.isGranted) {
           if (mounted) {
@@ -242,7 +242,7 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> with Single
       }
 
       final XFile? photo = await _picker.pickImage(
-        source: fromGallery ? ImageSource.gallery : ImageSource.camera,
+        source: ImageSource.camera,
         preferredCameraDevice: CameraDevice.front,
         maxWidth: 800,
         maxHeight: 800,
@@ -675,7 +675,7 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> with Single
               ? "Mapping geometric facial contour points into a 128-dimensional biometric template."
               : (_isFaceLockEnrolled
                   ? "Facial geometry vector is stored locally and synced to Supabase Cloud."
-                  : "Capture your face via the front camera or choose a clear portrait photo from your gallery."),
+                  : "Capture your face live via the front camera with good lighting."),
           textAlign: TextAlign.center,
           style: const TextStyle(fontSize: 13, color: VaultTheme.textSecondary),
         ),
@@ -700,7 +700,7 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> with Single
         ],
         const Spacer(),
         ElevatedButton.icon(
-          onPressed: _isScanningFace ? null : () => _enrollFaceLock(fromGallery: false),
+          onPressed: _isScanningFace ? null : _enrollFaceLock,
           icon: const Icon(Icons.camera_front, color: Colors.black),
           label: Text(
             _isScanningFace
@@ -710,21 +710,6 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> with Single
           ),
           style: ElevatedButton.styleFrom(
             backgroundColor: VaultTheme.primaryCyan,
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            minimumSize: const Size.fromHeight(46),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-        ),
-        const SizedBox(height: 10),
-        OutlinedButton.icon(
-          onPressed: _isScanningFace ? null : () => _enrollFaceLock(fromGallery: true),
-          icon: const Icon(Icons.photo_library_outlined, color: VaultTheme.primaryCyan),
-          label: const Text(
-            "SELECT FACE PHOTO FROM GALLERY",
-            style: TextStyle(color: VaultTheme.primaryCyan, fontWeight: FontWeight.bold),
-          ),
-          style: OutlinedButton.styleFrom(
-            side: const BorderSide(color: VaultTheme.primaryCyan),
             padding: const EdgeInsets.symmetric(vertical: 14),
             minimumSize: const Size.fromHeight(46),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

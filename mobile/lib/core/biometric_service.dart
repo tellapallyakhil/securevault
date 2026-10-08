@@ -269,35 +269,35 @@ class BiometricService {
 
           debugPrint('FaceLock landmark similarity: ${(percent).toStringAsFixed(1)}%');
 
-          // Threshold: 65% geometric landmark match
-          if (similarity >= 0.65 || result.faceTemplateHash == storedHash) {
+          // Strict Threshold: 80% geometric match required
+          if (similarity >= 0.80) {
             return {
               'success': true,
-              'message': 'FaceLock confirmed (${percent.toStringAsFixed(1)}% similarity)!',
+              'message': 'FaceLock confirmed (${percent.toStringAsFixed(1)}% match)!',
               'similarity': similarity,
             };
           } else {
             return {
               'success': false,
-              'message': 'Face template does not match (${percent.toStringAsFixed(1)}% similarity). Try again.',
+              'message': 'Face does not match enrolled profile (${percent.toStringAsFixed(1)}% match). Access denied.',
               'similarity': similarity,
             };
           }
         } catch (_) {}
       }
 
-      // 4. Hash comparison fallback
+      // 4. Strict template hash comparison
       if (storedHash != null && result.faceTemplateHash != null) {
-        final matches = (result.faceTemplateHash == storedHash) || result.faceDetected;
+        final matches = (result.faceTemplateHash == storedHash);
         return {
           'success': matches,
-          'message': matches ? 'FaceLock verified!' : 'Face signature does not match.',
+          'message': matches ? 'FaceLock verified!' : 'Face signature does not match enrolled profile. Access denied.',
         };
       }
 
       return {
-        'success': result.faceDetected,
-        'message': 'Face verified.',
+        'success': false,
+        'message': 'Face verification failed: Unrecognized biometric profile.',
       };
     } catch (e) {
       debugPrint("FaceLock verification error: $e");

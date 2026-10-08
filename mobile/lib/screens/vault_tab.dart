@@ -214,6 +214,55 @@ class VaultTab extends StatelessWidget {
                     ),
                   ),
                 ),
+                const SizedBox(width: 4),
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert, size: 20, color: VaultTheme.textMuted),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  color: VaultTheme.surfaceElevated,
+                  onSelected: (val) {
+                    if (val == 'download') {
+                      _downloadDocument(context, doc);
+                    } else if (val == 'details') {
+                      _showDocumentDetailsModal(context, doc);
+                    } else if (val == 'delete') {
+                      _confirmDeleteDocument(context, doc);
+                    }
+                  },
+                  itemBuilder: (ctx) => [
+                    const PopupMenuItem(
+                      value: 'details',
+                      child: Row(
+                        children: [
+                          Icon(Icons.info_outline, size: 16, color: VaultTheme.primaryCyan),
+                          SizedBox(width: 8),
+                          Text("View Details", style: TextStyle(color: VaultTheme.textPrimary, fontSize: 13)),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'download',
+                      child: Row(
+                        children: [
+                          Icon(Icons.download, size: 16, color: VaultTheme.statusSafe),
+                          SizedBox(width: 8),
+                          Text("Decrypt & Download", style: TextStyle(color: VaultTheme.textPrimary, fontSize: 13)),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuDivider(),
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete_outline, size: 16, color: VaultTheme.statusDanger),
+                          SizedBox(width: 8),
+                          Text("Delete Document", style: TextStyle(color: VaultTheme.statusDanger, fontSize: 13, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
             if (doc.summaryPreview != null && doc.summaryPreview!.isNotEmpty) ...[
@@ -388,6 +437,23 @@ class VaultTab extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 10),
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(modalCtx);
+                      _confirmDeleteDocument(context, doc);
+                    },
+                    icon: const Icon(Icons.delete_outline, color: VaultTheme.statusDanger, size: 18),
+                    label: const Text(
+                      "Delete Document from Vault",
+                      style: TextStyle(color: VaultTheme.statusDanger, fontWeight: FontWeight.bold),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: VaultTheme.statusDanger),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
                 ],
               ),
             ),
@@ -521,5 +587,101 @@ class VaultTab extends StatelessWidget {
       default:
         return Icons.insert_drive_file_outlined;
     }
+  }
+
+  Future<void> _downloadDocument(BuildContext context, VaultDocument doc) async {
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    scaffoldMessenger.showSnackBar(
+      SnackBar(
+        content: Text("Decrypting '${doc.originalName}' (AES-256-GCM)..."),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+    try {
+      final result = await ApiService().downloadAndDecryptDocument(doc);
+      if (context.mounted) {
+        _showDecryptedSuccessDialog(context, result, doc);
+      }
+    } catch (e) {
+      if (context.mounted) {
+        scaffoldMessenger.showSnackBar(
+          SnackBar(
+            content: Text("Decryption error: $e"),
+            backgroundColor: VaultTheme.statusDanger,
+          ),
+        );
+      }
+    }
+  }
+
+  void _confirmDeleteDocument(BuildContext context, VaultDocument doc) {
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: VaultTheme.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.delete_forever, color: VaultTheme.statusDanger, size: 24),
+            SizedBox(width: 8),
+            Text(
+              "Delete Document",
+              style: TextStyle(color: VaultTheme.textPrimary, fontWeight: FontWeight.bold, fontSize: 17),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              "Are you sure you want to permanently delete '${doc.originalName}'?",
+              style: const TextStyle(color: VaultTheme.textSecondary, fontSize: 14),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: VaultTheme.statusDanger.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: VaultTheme.statusDanger.withValues(alpha: 0.3)),
+              ),
+              child: const Text(
+                "🔒 This will permanently remove the encrypted document from your device local storage and Supabase cloud metadata.",
+                style: TextStyle(color: VaultTheme.statusDanger, fontSize: 12),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: const Text("Cancel", style: TextStyle(color: VaultTheme.textMuted)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(dialogCtx);
+              final scaffoldMessenger = ScaffoldMessenger.of(context);
+              final vault = context.read<VaultProvider>();
+              final success = await vault.deleteDocument(doc.id);
+              if (context.mounted) {
+                scaffoldMessenger.showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      success
+                          ? "'${doc.originalName}' permanently deleted."
+                          : "Failed to delete '${doc.originalName}'.",
+                    ),
+                    backgroundColor: success ? VaultTheme.statusSafe : VaultTheme.statusDanger,
+                  ),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: VaultTheme.statusDanger),
+            child: const Text("Delete Permanently", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
   }
 }

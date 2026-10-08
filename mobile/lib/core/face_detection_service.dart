@@ -231,21 +231,33 @@ class FaceDetectionService {
     );
   }
 
-  /// Compare two biometric landmark vectors and calculate similarity (0.0 to 1.0)
+  /// Compare two biometric landmark vectors and calculate strict similarity (0.0 to 1.0).
+  /// Uses normalized relative error of invariant facial geometric proportions.
   double calculateSimilarity(List<double> enrolled, List<double> scanned) {
     if (enrolled.isEmpty || scanned.isEmpty) return 0.0;
     final length = math.min(enrolled.length, scanned.length);
-    if (length == 0) return 0.0;
+    if (length < 8) return 0.0;
 
-    double sumSqDiff = 0.0;
+    double totalRelativeError = 0.0;
+    int count = 0;
+
     for (int i = 0; i < length; i++) {
-      final diff = enrolled[i] - scanned[i];
-      sumSqDiff += diff * diff;
+      final e = enrolled[i];
+      final s = scanned[i];
+      if (e.abs() > 0.001) {
+        final relErr = (e - s).abs() / e.abs();
+        totalRelativeError += relErr;
+        count++;
+      }
     }
 
-    final distance = math.sqrt(sumSqDiff);
-    // Convert distance to similarity score
-    final similarity = 1.0 / (1.0 + distance);
+    if (count == 0) return 0.0;
+
+    final avgError = totalRelativeError / count;
+    // Identical face: avgError ~ 0.0 -> similarity ~ 1.0
+    // Same person slight variation: avgError 0.03 - 0.08 -> similarity 0.84 - 0.94
+    // Different person: avgError > 0.20 -> similarity < 0.60
+    final similarity = (1.0 - (avgError * 2.0)).clamp(0.0, 1.0);
     return similarity;
   }
 }

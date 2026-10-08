@@ -36,7 +36,12 @@ class ApiService {
   Future<void> initCustomUrl() async {
     final custom = await _storage.read(key: 'custom_api_base_url');
     if (custom != null && custom.isNotEmpty) {
-      setBaseUrl(custom);
+      if (custom.contains('trycloudflare.com') || custom.contains('10.0.2.2')) {
+        await _storage.delete(key: 'custom_api_base_url');
+        setBaseUrl('https://securevault-4rpl.onrender.com/api/v1');
+      } else {
+        setBaseUrl(custom);
+      }
     }
   }
 
@@ -424,6 +429,100 @@ class ApiService {
     }
   }
 
+  /// Permanently delete a document from Supabase Cloud, local phone storage, and backend
+  Future<bool> deleteDocument(String docId) async {
+    final userId = await getCurrentUserIdOrNull();
+    if (userId == null) return false;
+
+    bool deletedFromSupabase = false;
+
+    // 1. Delete from Supabase Cloud
+    try {
+      final List results = await _supabase
+          .from('documents')
+          .select()
+          .eq('id', docId)
+          .eq('user_id', userId);
+
+      String? encryptedFilename;
+      String? originalName;
+      if (results.isNotEmpty) {
+        encryptedFilename = results.first['encrypted_filename']?.toString();
+        originalName = results.first['original_name']?.toString();
+      }
+
+      await _supabase
+          .from('documents')
+          .delete()
+          .eq('id', docId)
+          .eq('user_id', userId);
+
+      deletedFromSupabase = true;
+
+      // Clean up local phone storage
+      if (!kIsWeb && encryptedFilename != null) {
+        try {
+          final appDocDir = await getApplicationDocumentsDirectory();
+          final localFile = File('${appDocDir.path}/vault_storage/$userId/$encryptedFilename');
+          if (await localFile.exists()) {
+            await localFile.delete();
+            debugPrint('Deleted local file: ${localFile.path}');
+          }
+        } catch (fileErr) {
+          debugPrint('Local file deletion error: $fileErr');
+        }
+      }
+
+      // Record audit log
+      try {
+        await _supabase.from('audit_logs').insert({
+          'user_id': userId,
+          'action': 'DOCUMENT_DELETE',
+          'ip_address': 'client-direct',
+          'risk_score': 0,
+          'is_anomaly': false,
+          'details': {'doc_id': docId, 'filename': originalName ?? 'unknown'},
+        });
+      } catch (_) {}
+    } catch (e) {
+      debugPrint('Supabase document delete exception: $e');
+    }
+
+    // 2. Also notify Backend REST endpoint to clean up server copy if present
+    try {
+      await _dio.delete('/documents/$docId');
+    } catch (backendErr) {
+      debugPrint('Backend delete notification: $backendErr');
+    }
+
+    return deletedFromSupabase;
+  }
+
+  /// High-accuracy backend OCR fallback for PDFs and scanned images
+  Future<String> extractTextFromBackend(Uint8List bytes, String filename) async {
+    try {
+      final formData = FormData.fromMap({
+        'file': MultipartFile.fromBytes(bytes, filename: filename),
+      });
+      final res = await _dio.post(
+        '/documents/extract-text',
+        data: formData,
+        options: Options(
+          receiveTimeout: const Duration(seconds: 40),
+          sendTimeout: const Duration(seconds: 25),
+        ),
+      );
+      if (res.statusCode == 200 && res.data != null) {
+        final text = res.data['extracted_text']?.toString() ?? '';
+        debugPrint('Backend OCR extracted ${text.length} chars for $filename');
+        return text;
+      }
+    } catch (e) {
+      debugPrint('Backend OCR extraction fallback exception: $e');
+    }
+    return '';
+  }
+
   Future<List<SearchResult>> searchVault(String query) async {
     final cleanQuery = query.trim().toLowerCase();
     if (cleanQuery.isEmpty) return [];
@@ -446,7 +545,7 @@ class ApiService {
       debugPrint('Backend vector search unavailable, switching to intelligent client-side semantic matching: $e');
     }
 
-    // 2. Fallback: Intelligent Client-Side Semantic Concept & Synonym Matching on Supabase
+    // 2. Fallback: Intelligent Client-Side Semantic Concept, Stem & Synonym Matching on Supabase
     try {
       final results = await _supabase
           .from('documents')
@@ -462,19 +561,51 @@ class ApiService {
           .where((w) => w.length > 1)
           .toSet();
 
-      // Semantic domain clusters
+      // Semantic domain clusters covering all user categories
       final Map<String, Set<String>> semanticClusters = {
-        'career': {'resume', 'cv', 'curriculum', 'vitae', 'job', 'career', 'employment', 'profile', 'work', 'experience'},
-        'medical': {'medical', 'prescription', 'doctor', 'hospital', 'health', 'cardiology', 'cardio', 'clinic', 'medicine', 'pills', 'drugs', 'diagnosis', 'checkup'},
-        'financial': {'tax', 'payment', 'invoice', 'bill', 'receipt', 'financial', 'statement', 'salary', 'revenue', 'audit', 'bank', 'cost', 'fee', 'aws'},
-        'identity': {'identity', 'id', 'aadhaar', 'pan', 'passport', 'citizen', 'voter', 'license', 'card', 'proof'},
-        'media': {'photo', 'image', 'picture', 'camera', 'screenshot', 'scan', 'jpg', 'png', 'jpeg'}
+        'educational': {
+          'education', 'educational', 'exam', 'examnr', 'examination', 'test',
+          'marksheet', 'marks', 'grade', 'transcript', 'questions', 'coding',
+          'java', 'python', 'programming', 'student', 'college', 'university',
+          'degree', 'diploma', 'certificate', 'assignment', 'coursework',
+          'school', 'academy', 'assessment', 'paper', 'syllabus', 'curriculum',
+          'study', 'semester', 'cgpa', 'gpa', 'btech', 'mtech', 'be', 'bsc',
+          'bcom', 'accenture', 'login', 'portal', 'question', 'answers', 'notes'
+        },
+        'career': {
+          'resume', 'cv', 'curriculum', 'vitae', 'job', 'career', 'employment',
+          'profile', 'work', 'experience', 'hiring', 'interview', 'offer',
+          'internship', 'developer', 'engineer', 'salary', 'accenture', 'tcs',
+          'infosys', 'wipro', 'google', 'microsoft', 'amazon', 'company'
+        },
+        'medical': {
+          'medical', 'prescription', 'doctor', 'hospital', 'health', 'cardiology',
+          'cardio', 'clinic', 'medicine', 'pills', 'drugs', 'diagnosis', 'checkup',
+          'patient', 'report', 'lab', 'blood', 'scan', 'rx', 'pharmacy', 'treatment'
+        },
+        'financial': {
+          'tax', 'payment', 'invoice', 'bill', 'receipt', 'financial', 'statement',
+          'salary', 'revenue', 'audit', 'bank', 'cost', 'fee', 'aws', 'income',
+          'expense', 'payslip', 'account', 'transaction', 'upi', 'credit', 'debit'
+        },
+        'identity': {
+          'identity', 'id', 'aadhaar', 'pan', 'passport', 'citizen', 'voter',
+          'license', 'card', 'proof', 'ssn', 'dl', 'driving', 'national', 'uidai'
+        },
+        'media': {
+          'photo', 'image', 'picture', 'camera', 'screenshot', 'scan', 'jpg',
+          'png', 'jpeg', 'pdf', 'document', 'doc'
+        },
+        'legal': {
+          'contract', 'agreement', 'terms', 'legal', 'policy', 'deed', 'nda',
+          'affidavit', 'compliance', 'court', 'stamp'
+        }
       };
 
       // Detect active query concepts
       final activeClusters = <String>{};
       for (final entry in semanticClusters.entries) {
-        if (entry.value.any((kw) => queryWords.contains(kw))) {
+        if (entry.value.any((kw) => queryWords.contains(kw) || cleanQuery.contains(kw) || kw.contains(cleanQuery))) {
           activeClusters.add(entry.key);
         }
       }
@@ -485,31 +616,73 @@ class ApiService {
         final name = (item['original_name']?.toString() ?? '').toLowerCase();
         final cat = (item['category']?.toString() ?? '').toLowerCase();
         final preview = (item['summary_preview']?.toString() ?? '').toLowerCase();
-        final corpus = '$name $cat $preview';
+
+        // Extract PII summary metadata (document_type, matched_types)
+        dynamic piiSummary = item['pii_summary'];
+        String docType = '';
+        String matchedTypes = '';
+        if (piiSummary is Map) {
+          docType = (piiSummary['document_type']?.toString() ?? '').toLowerCase();
+          final mt = piiSummary['matched_types'];
+          if (mt is List) {
+            matchedTypes = mt.join(' ').toLowerCase();
+          }
+        } else if (piiSummary is String) {
+          docType = piiSummary.toLowerCase();
+        }
+
+        // Tokenize filename into distinct alphanumeric words
+        final nameTokens = name
+            .replaceAll(RegExp(r'\.[a-zA-Z0-9]+$'), '')
+            .replaceAll(RegExp(r'[^a-zA-Z0-9\s]'), ' ')
+            .split(RegExp(r'\s+'))
+            .where((t) => t.length > 1)
+            .toSet();
+
+        final corpus = '$name $cat $preview $docType $matchedTypes ${nameTokens.join(' ')}'.toLowerCase();
 
         double score = 0.0;
 
-        // Exact phrase or word matches
+        // 1. Exact phrase matches
         if (cleanQuery.isNotEmpty && name.contains(cleanQuery)) {
-          score += 0.50;
+          score += 0.60;
+        } else if (cleanQuery.isNotEmpty && corpus.contains(cleanQuery)) {
+          score += 0.40;
         }
 
+        // 2. Query word-level token & substring matching
         for (final word in queryWords) {
-          if (name.contains(word)) score += 0.30;
-          if (cat.contains(word)) score += 0.20;
-          if (preview.contains(word)) score += 0.15;
+          if (nameTokens.contains(word)) {
+            score += 0.35;
+          } else if (name.contains(word)) {
+            score += 0.30;
+          }
+
+          if (cat.contains(word)) score += 0.25;
+          if (docType.contains(word)) score += 0.25;
+          if (preview.contains(word) || corpus.contains(word)) score += 0.15;
+
+          // Fuzzy root / prefix matching (e.g., 'educat' vs 'educational', 'exam' vs 'examination')
+          if (word.length >= 3) {
+            for (final token in nameTokens) {
+              if (token.length >= 3 && (token.startsWith(word) || word.startsWith(token))) {
+                score += 0.25;
+                break;
+              }
+            }
+          }
         }
 
-        // Semantic cluster overlap
+        // 3. Semantic cluster overlap
         for (final cluster in activeClusters) {
           final clusterKeywords = semanticClusters[cluster]!;
           final hits = clusterKeywords.where((kw) => corpus.contains(kw)).length;
           if (hits > 0) {
-            score += min(0.40, hits * 0.15);
+            score += min(0.45, hits * 0.15);
           }
         }
 
-        if (score > 0.15) {
+        if (score >= 0.05) {
           scored.add({
             'item': item,
             'score': min(1.0, score),
@@ -523,16 +696,18 @@ class ApiService {
         final item = entry['item'] as Map<String, dynamic>;
         final sc = entry['score'] as double;
         final preview = item['summary_preview']?.toString() ?? '';
-        String snippet = 'Semantic match: ${(sc * 100).toInt()}%';
+        final category = item['category']?.toString() ?? 'General';
+        final docType = (item['pii_summary'] is Map ? item['pii_summary']['document_type']?.toString() : null) ?? category;
+        String snippet = 'Semantic match: ${(sc * 100).toInt()}% • $docType';
         if (preview.isNotEmpty && !preview.startsWith('Encrypted') && !preview.startsWith('[')) {
-          snippet = '$snippet • ${preview.length > 60 ? "${preview.substring(0, 60)}..." : preview}';
+          snippet = '$snippet • ${preview.length > 50 ? "${preview.substring(0, 50)}..." : preview}';
         }
 
         return SearchResult(
           docId: item['id']?.toString() ?? '',
           score: double.parse(sc.toStringAsFixed(2)),
           originalName: item['original_name']?.toString() ?? 'Document',
-          category: item['category']?.toString() ?? 'General',
+          category: category,
           sensitivity: item['sensitivity']?.toString() ?? 'LOW',
           snippet: snippet,
         );

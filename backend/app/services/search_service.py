@@ -63,6 +63,8 @@ class SearchService:
         lower_name = (filename + " " + category).lower()
         if "resume" in lower_name or "cv" in lower_name:
             tags.append("curriculum vitae resume job application career employment work history education candidate skills profile")
+        if category.lower() in ["educational", "education"] or any(w in lower_name for w in ["exam", "test", "marksheet", "marks", "grade", "transcript", "questions", "coding", "java", "student", "college", "university", "degree", "assignment", "coursework", "syllabus", "examnr"]):
+            tags.append("educational academic examination exam test marksheet degree certificate college university student school coursework syllabus question paper coding questions programming")
         if category.lower() == "medical" or any(w in lower_name for w in ["health", "prescription", "cardio", "doctor", "hospital"]):
             tags.append("medical prescription doctor hospital healthcare clinic diagnosis patient illness cardiology medication pharmacy drugs pills")
         if category.lower() == "financial" or any(w in lower_name for w in ["tax", "invoice", "bill", "salary", "audit", "payment", "revenue", "aws"]):
