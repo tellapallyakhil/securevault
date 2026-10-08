@@ -19,7 +19,16 @@ class PIIService:
     }
 
     CATEGORY_KEYWORDS = {
-        "Educational": ["university", "academy", "education", "college", "school", "marksheet", "grade", "gpa", "semester", "ieee", "seminar", "student", "faculty", "professor", "symposium", "conference", "dean", "degree", "diploma", "certificate", "transcript", "btech", "mtech"],
+        "Educational": [
+            "university", "academy", "education", "college", "school", "marksheet",
+            "grade", "gpa", "cgpa", "sgpa", "semester", "ieee", "seminar", "student",
+            "faculty", "professor", "symposium", "conference", "dean", "degree",
+            "diploma", "certificate", "transcript", "btech", "mtech", "exam", "examnr",
+            "examination", "test", "assessment", "coding questions", "question paper",
+            "questions", "assignment", "coursework", "study material", "tutorial",
+            "syllabus", "course", "curriculum", "lecture", "notes", "hall ticket",
+            "admit card", "roll no", "enrollment"
+        ],
         "Career": ["resume", "cv", "curriculum vitae", "experience", "skills", "projects", "employment", "candidate", "qualification", "work history"],
         "Financial": ["invoice", "receipt", "bank", "statement", "salary", "tax", "payment", "credit", "debit", "account", "balance", "total", "gstin", "amount", "due", "billing", "subtotal", "aws", "transaction"],
         "Identity": ["aadhaar", "pan", "passport", "license", "voter", "birth", "identity", "citizenship", "id card", "govt", "government of india", "dob", "gender", "national id"],

@@ -65,6 +65,16 @@ class OCRService:
                         text = page.extract_text()
                         if text and text.strip():
                             page_texts.append(text.strip())
+                    if not page_texts:
+                        # Scanned PDF fallback: extract embedded images and perform OCR
+                        for page in reader.pages:
+                            try:
+                                for image_file in page.images:
+                                    img_text = cls.extract_text_from_bytes(image_file.data, image_file.name)
+                                    if img_text and img_text.strip():
+                                        page_texts.append(img_text.strip())
+                            except Exception:
+                                pass
                     if page_texts:
                         extracted_text = "\n\n".join(page_texts)
                 except Exception as pdf_err:
@@ -82,7 +92,7 @@ class OCRService:
             except Exception:
                 pass
 
-            return f"[PDF document content parsed from {filename}]"
+            return ""
 
         # 3. Image Formats (Photos, Scans, Camera Shots, WhatsApp media)
         if ext in [".png", ".jpg", ".jpeg", ".bmp", ".tiff", ".webp"]:

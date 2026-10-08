@@ -8,7 +8,14 @@ from app.core.config import settings
 pwd_context = CryptContext(schemes=["argon2", "bcrypt"], deprecated="auto")
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+    import hashlib
+    # Support client direct SHA-256 hex hashes
+    if len(hashed_password) == 64 and all(c in "0123456789abcdefABCDEF" for c in hashed_password):
+        return hashlib.sha256(plain_password.encode('utf-8')).hexdigest() == hashed_password
+    try:
+        return pwd_context.verify(plain_password, hashed_password)
+    except Exception:
+        return False
 
 def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)

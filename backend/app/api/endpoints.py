@@ -238,6 +238,80 @@ async def list_documents(
     )
     return result.scalars().all()
 
+@router.delete("/documents/{doc_id}")
+async def delete_document(
+    doc_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Permanently deletes a document from the vault:
+    - Removes metadata record from the database
+    - Cleans up encrypted file payload on disk
+    - Logs audit event
+    """
+    result = await db.execute(
+        select(Document).where(Document.id == doc_id, Document.user_id == current_user.id)
+    )
+    doc = result.scalars().first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    # Delete encrypted file on disk
+    try:
+        file_path = settings.VAULT_DIR / doc.encrypted_filename
+        if file_path.exists():
+            file_path.unlink()
+    except Exception:
+        pass
+
+    # Delete related share links
+    try:
+        share_res = await db.execute(select(ShareLink).where(ShareLink.doc_id == doc_id))
+        for sl in share_res.scalars().all():
+            await db.delete(sl)
+    except Exception:
+        pass
+
+    await db.delete(doc)
+
+    db.add(AuditLog(
+        user_id=current_user.id,
+        action="DOCUMENT_DELETE",
+        risk_score=5,
+        is_anomaly=False,
+        details={"doc_id": doc_id, "filename": doc.original_name}
+    ))
+    await db.commit()
+
+    return {"status": "success", "message": f"Document '{doc.original_name}' deleted.", "doc_id": doc_id}
+
+@router.post("/documents/extract-text")
+async def extract_document_text(
+    file: UploadFile = File(...)
+):
+    """
+    On-demand high-accuracy OCR & multi-page PDF text extraction.
+    Parses multi-page PDFs using pypdf and images using RapidOCR/Tesseract.
+    Returns extracted text, detected category, and PII summary.
+    No file bytes are retained on disk.
+    """
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+
+    extracted_text = ocr_service.extract_text_from_bytes(content, file.filename)
+    pii_analysis = pii_service.analyze_text(extracted_text)
+
+    return {
+        "filename": file.filename,
+        "extracted_text": extracted_text,
+        "char_count": len(extracted_text),
+        "category": pii_analysis.get("category", "General"),
+        "sensitivity": pii_analysis.get("sensitivity", "LOW"),
+        "pii_summary": pii_analysis
+    }
+
 @router.get("/documents/{doc_id}/download")
 async def download_document(
     doc_id: str,
