@@ -26,8 +26,8 @@ class ApiService {
   late Dio _dio;
   final _storage = const FlutterSecureStorage();
 
-  // Fallback REST endpoint (optional Cloudflare tunnel / local server)
-  String _baseUrl = 'https://parameter-sunny-aging-capability.trycloudflare.com/api/v1';
+  // Production Render REST endpoint
+  String _baseUrl = 'https://securevault-4rpl.onrender.com/api/v1';
 
   String get baseUrl => _baseUrl;
 
