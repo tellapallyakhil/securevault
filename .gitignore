@@ -1,0 +1,62 @@
+# ===================================================
+# SecureVault AI - Git Ignore
+# ===================================================
+
+# Environment Variables & Secrets
+.env
+*.env
+!.env.example
+backend/.env
+
+# Large Binary Builds (>100MB exceeds GitHub push limits)
+*.apk
+*.aab
+/SecureVault_AI_Release.apk
+
+# Python Virtual Environments & Bytecode
+venv/
+.venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+*.pytest_cache/
+.coverage
+htmlcov/
+
+# Local Vault Storage, FAISS Indices, and SQLite DBs
+backend/vault_storage/
+backend/faiss_index/
+backend/graphs/
+*.db
+*.sqlite
+*.sqlite3
+
+# Flutter & Dart Build Artifacts
+mobile/build/
+build/
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+
+# Android Build Intermediate Artifacts
+mobile/android/.gradle/
+mobile/android/local.properties
+mobile/android/app/build/
+**/android/app/debug/
+**/android/app/profile/
+**/android/app/release/
+
+# IDE & Editor Configurations
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+
+# OS Specific
+.DS_Store
+Thumbs.db
+Desktop.ini
